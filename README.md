@@ -56,17 +56,7 @@
 <h3>Example</h3>
 
 <p><code>powershell
-.\SystemSetup.ps1
+.\nwb.ps1
 </code></p>
 
 <p>Once the script is executed, all the tasks will run automatically, including system updates, bloatware removal, app installations, and configuration of user accounts and firewall.</p>
-
-<h2>License</h2>
-
-<p>This project is licensed under the MIT License - see the <a href="LICENSE">LICENSE</a> file for details.</p>
-
-<h2>Author</h2>
-
-<ul>
-<li><strong>JGooch</strong> - Original developer</li>
-</ul>
