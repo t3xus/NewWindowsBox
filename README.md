@@ -5,14 +5,14 @@
 <p>This script automates the setup and configuration of a Windows system by:</p>
 
 <ul>
-<li>Running silent Windows updates (including security patches).</li>
-<li>Enabling dark mode if it's not already enabled.</li>
 <li>Disabling Xbox app from startup.</li>
 <li>Removing unnecessary third-party applications (bloatware).</li>
 <li>Cleaning up the Start Menu by unpinning unnecessary apps and pinning essential ones.</li>
+<li>Silently install openSSH & Configuring the firewall for SSH access.</li>
 <li>Silently installing <strong>TeamViewer</strong>, <strong>Office 365</strong>, <strong>Adobe Acrobat Pro</strong>, and <strong>Tailscale</strong>.</li>
 <li>Prompting the user to add a new user account with customizable options for username, password, and admin privileges.</li>
-<li>Configuring the firewall for SSH access.</li>
+<li>Running silent Windows updates (including security patches).</li>
+<li>Enabling dark mode if it's not already enabled.</li>
 </ul>
 
 <h2>Features</h2>
@@ -64,5 +64,5 @@
 <h2>Author</h2>
 
 <ul>
-<li><strong>[Your Name]</strong> - Original developer</li>
+<li><strong>JGooch</strong> - Original developer</li>
 </ul>
