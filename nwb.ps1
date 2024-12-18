@@ -1,199 +1,147 @@
 <#
 .SYNOPSIS
-    This script performs various system setup tasks including running Windows Update, enabling dark mode, disabling the Xbox app from startup, removing third-party bloatware, cleaning the Start Menu, configuring firewall rules for SSH access, installing necessary applications like TeamViewer, Office 365, Adobe Acrobat Pro, and Tailscale, and installing the latest Windows security patches.
-
-.DESCRIPTION
-    - Silently installs and applies Windows updates, including security patches.
-    - Ensures dark mode is enabled if not already active.
-    - Disables the Xbox app from starting with Windows by removing its startup registry entries.
-    - Removes third-party apps (bloatware) that come pre-installed on Windows.
-    - Cleans the Start Menu by unpinning unnecessary apps and pinning only essential apps.
-    - Silently installs TeamViewer, Office 365, Adobe Acrobat Pro, and Tailscale with no user interaction.
-    - Prompts the user to add a new account with polished UI.
-    - Configures the firewall to allow SSH traffic through port 22.
+    New Windows Install Script
+    Installs and configures SSH, creates SSH login credentials, updates Windows, blocks China via hosts, and installs applications.
 
 .NOTES
-    Author: [Your Name]
-    Date: [Date]
-    Version: 1.4
+    Author: James Gooch
+    Version: 2.2
 #>
 
-# Function to display a progress bar
-function Show-Progress {
-    param (
-        [string]$activity,
-        [int]$percentComplete,
-        [string]$status
-    )
-    Write-Progress -Activity $activity -PercentComplete $percentComplete -Status $status
+# Variables
+$logFile = "$env:TEMP\NewWindowsInstall.log"
+$appConfig = ".\apps.json"
+$sshCredentialsFile = "$env:USERPROFILE\Desktop\ssh_credentials.txt"
+
+# Logging Function
+function Write-Log {
+    param ([string]$Message, [string]$Level = "INFO")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "[$timestamp] [$Level] $Message"
+    Add-Content -Path $logFile -Value $logEntry
+    Write-Host $Message
 }
 
-# Function to install Windows security patches silently
-function Install-WindowsSecurityPatches {
-    Write-Host "Installing the latest Windows security patches..."
-
-    # Install the PSWindowsUpdate module if not already present
-    if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-        Install-Module PSWindowsUpdate -Force -AllowClobber -ErrorAction SilentlyContinue
+# Prompt for Yes/No Confirmation
+function Confirm-Execution {
+    Add-Type -AssemblyName PresentationFramework
+    $result = [System.Windows.MessageBox]::Show("This script will configure your system, install SSH, update Windows, and install applications. Proceed?", "Confirmation", "YesNo", "Question")
+    if ($result -ne "Yes") {
+        Write-Log "Script execution cancelled by user." -Level "WARNING"
+        Exit
     }
+}
+
+# Ensure apps.json Exists
+function Initialize-AppConfig {
+    if (-not (Test-Path $appConfig)) {
+        Write-Log "Creating default apps.json..."
+        $defaultApps = @(
+            @{ Name = "TeamViewer"; URL = "https://download.teamviewer.com/download/TeamViewer_Setup.exe" },
+            @{ Name = "Tailscale"; URL = "https://pkgs.tailscale.com/stable/tailscale-setup.exe" }
+        )
+        $defaultApps | ConvertTo-Json | Out-File -FilePath $appConfig -Encoding UTF8
+        Write-Host "Default 'apps.json' created. Please edit it to customize application installations."
+        Exit
+    }
+}
+
+# Install OpenSSH Server
+function Install-SSHServer {
+    Write-Log "Installing OpenSSH Server..."
+    Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+    Start-Service sshd
+    Set-Service -Name sshd -StartupType 'Automatic'
+    Write-Log "OpenSSH Server installed and configured."
+}
+
+# Create SSH Login Credentials
+function Generate-SSHCredentials {
+    Write-Log "Generating SSH login credentials..."
+    $username = "sshuser"
+    $password = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 12 | ForEach-Object {[char]$_})
+
+    # Create a new user
+    New-LocalUser -Name $username -Password (ConvertTo-SecureString -AsPlainText $password -Force) -Description "SSH User"
+
+    # Add to Administrators group
+    Add-LocalGroupMember -Group "Administrators" -Member $username
+
+    # Save credentials to desktop
+    "SSH Username: $username`nSSH Password: $password`nHost: $env:COMPUTERNAME" | Out-File -FilePath $sshCredentialsFile -Encoding UTF8
+    Write-Log "SSH credentials saved to $sshCredentialsFile"
+}
+
+# Ensure Windows Firewall is Enabled and Allow SSH
+function Configure-Firewall {
+    Write-Log "Configuring Windows Firewall for SSH..."
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+    New-NetFirewallRule -DisplayName "Allow SSH" -Direction Inbound -LocalPort 22 `
+        -Protocol TCP -Action Allow -ErrorAction SilentlyContinue
+    Write-Log "Windows Firewall enabled and SSH allowed."
+}
+
+# Block China via Hosts File
+function Block-ChinaHosts {
+    Write-Log "Blocking Chinese domains in hosts file..."
+    $hostsFile = "C:\Windows\System32\drivers\etc\hosts"
+    $chinaDomains = @"
+# Block Chinese domains
+127.0.0.1 baidu.com
+127.0.0.1 qq.com
+127.0.0.1 wechat.com
+127.0.0.1 alibaba.com
+127.0.0.1 tencent.com
+"@
+
+    Add-Content -Path $hostsFile -Value $chinaDomains -Force
+    Write-Log "Chinese domains have been blocked in hosts file."
+}
+
+# Install Windows Updates
+function Install-WindowsUpdates {
+    Write-Log "Installing Windows Updates..."
+    Install-Module -Name PSWindowsUpdate -Force -AllowClobber -ErrorAction SilentlyContinue
     Import-Module PSWindowsUpdate
-
-    # Get only security updates
-    Show-Progress -Activity "Checking for security patches" -PercentComplete 0 -Status "Checking for Windows security patches..."
-    Start-Sleep -Seconds 2
-
-    # Install all available security updates
-    Get-WindowsUpdate -Install -AcceptAll -AutoReboot -Verbose -Category Security | Out-Null
-
-    Show-Progress -Activity "Installing security patches" -PercentComplete 50 -Status "Installing Windows security patches..."
-    Start-Sleep -Seconds 2
-
-    Show-Progress -Activity "Security patches installed" -PercentComplete 100 -Status "Windows security patches are up to date!"
-    Write-Host "Windows security patches have been installed."
-}
-
-# Function to prompt for account creation
-function Add-NewAccount {
-    Write-Host "Prompting user to create a new account..."
-
-    # Ask user if they want to create a new account
-    $createAccount = $Host.UI.PromptForChoice("New Account", "Do you want to add a new account to the system?", @("&Yes", "&No"), 0)
-
-    if ($createAccount -eq 0) {  # If user selects 'Yes'
-
-        # Prompt for the new username
-        $newUsername = Read-Host "Enter the new username"
-
-        # Prompt for the new password (as secure string)
-        $newPassword = Read-Host "Enter the new password" -AsSecureString
-
-        # Prompt if the user should be an admin
-        $isAdmin = $Host.UI.PromptForChoice("New Account Role", "Should this account have administrative privileges?", @("Yes", "No"), 0)
-
-        # Create the new user account
-        $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($newPassword))
-        $securePassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
-        New-LocalUser -Name $newUsername -Password $securePassword -PasswordNeverExpires -FullName $newUsername -Description "Created via script"
-
-        # Add user to admin group if selected
-        if ($isAdmin -eq 0) {
-            Add-LocalGroupMember -Group "Administrators" -Member $newUsername
-            Write-Host "New admin account '$newUsername' created."
-        } else {
-            Write-Host "New standard account '$newUsername' created."
-        }
-    } else {
-        Write-Host "No new account will be added."
-    }
-}
-
-# Function to install TeamViewer silently
-function Install-TeamViewer {
-    Write-Host "Installing TeamViewer..."
-
-    $teamViewerUrl = "https://download.teamviewer.com/download/TeamViewer_Setup.exe"
-    $teamViewerInstaller = "$env:TEMP\TeamViewer_Setup.exe"
-
-    # Download the TeamViewer installer
-    Write-Host "Downloading TeamViewer installer..."
-    Invoke-WebRequest -Uri $teamViewerUrl -OutFile $teamViewerInstaller
-
-    # Install TeamViewer silently
-    Show-Progress -Activity "Installing TeamViewer" -PercentComplete 50 -Status "Installing TeamViewer..."
-    Start-Process -FilePath $teamViewerInstaller -ArgumentList "/S" -Wait
-
-    # Confirm installation
-    if (Get-Command "C:\Program Files (x86)\TeamViewer\TeamViewer.exe" -ErrorAction SilentlyContinue) {
-        Write-Host "TeamViewer installation complete."
-    } else {
-        Write-Host "TeamViewer installation failed."
-    }
-}
-
-# Function to install Office 365 silently
-function Install-Office365 {
-    Write-Host "Installing Office 365..."
-
-    # Download and execute the Office deployment tool
-    $officeSetupUrl = "https://aka.ms/office365ProPlusWindowsDesktop"
-    $officeSetupFile = "$env:TEMP\OfficeSetup.exe"
-    
-    # Download Office setup
-    Write-Host "Downloading Office 365 installer..."
-    Invoke-WebRequest -Uri $officeSetupUrl -OutFile $officeSetupFile
-    
-    # Install Office 365 silently
-    Show-Progress -Activity "Installing Office 365" -PercentComplete 50 -Status "Installing Office 365..."
-    Start-Process -FilePath $officeSetupFile -ArgumentList "/configure" -Wait
-
-    Write-Host "Office 365 installation complete."
-}
-
-# Function to install Adobe Acrobat Pro silently
-function Install-AcrobatPro {
-    Write-Host "Installing Adobe Acrobat Pro..."
-
-    $acrobatUrl = "https://trials3.adobe.com/AdobeProducts/APRO/Acrobat_HelpX/Acrobat_DC_Web_WWMUI.zip"
-    $acrobatInstallerZip = "$env:TEMP\AcrobatPro.zip"
-    $acrobatInstallerDir = "$env:TEMP\AcrobatPro"
-
-    # Download the Acrobat Pro installer
-    Write-Host "Downloading Adobe Acrobat Pro installer..."
-    Invoke-WebRequest -Uri $acrobatUrl -OutFile $acrobatInstallerZip
-
-    # Extract the zip
-    Expand-Archive -Path $acrobatInstallerZip -DestinationPath $acrobatInstallerDir -Force
-
-    # Install Acrobat Pro silently
-    $acrobatInstaller = "$acrobatInstallerDir\Setup.exe"
-    Show-Progress -Activity "Installing Adobe Acrobat Pro" -PercentComplete 50 -Status "Installing Acrobat Pro..."
-    Start-Process -FilePath $acrobatInstaller -ArgumentList "/sALL" -Wait
-
-    Write-Host "Adobe Acrobat Pro installation complete."
-}
-
-# Function to install Tailscale silently
-function Install-Tailscale {
-    Write-Host "Installing Tailscale..."
-
-    # Tailscale download link
-    $tailscaleUrl = "https://pkgs.tailscale.com/stable/tailscale-setup.exe"
-    $tailscaleInstaller = "$env:TEMP\Tailscale_Setup.exe"
-
-    # Download the installer
-    Write-Host "Downloading Tailscale installer..."
-    Invoke-WebRequest -Uri $tailscaleUrl -OutFile $tailscaleInstaller
-
-    # Install Tailscale silently
-    Show-Progress -Activity "Installing Tailscale" -PercentComplete 50 -Status "Installing Tailscale..."
-    Start-Process -FilePath $tailscaleInstaller -ArgumentList "/quiet" -Wait
-
-    Write-Host "Tailscale installation complete."
-}
-
-# Function to run Windows Update silently with progress
-function Run-WindowsUpdate {
-    Write-Host "Running Windows Update..."
-
-    Install-Module PSWindowsUpdate -Force -AllowClobber -ErrorAction SilentlyContinue
-    Import-Module PSWindowsUpdate
-
-    Show-Progress -Activity "Checking for Windows updates" -PercentComplete 0 -Status "Initializing update process..."
-    Start-Sleep -Seconds 1
-
-    # Install all available updates
     Get-WindowsUpdate -Install -AcceptAll -AutoReboot -Verbose | Out-Null
-
-    Show-Progress -Activity "Installing updates" -PercentComplete 50 -Status "Installing updates in progress..."
-    Start-Sleep -Seconds 1
-
-    Show-Progress -Activity "Updates completed" -PercentComplete 100 -Status "System is up to date!"
-    Write-Host "Windows updates have been installed successfully."
+    Write-Log "Windows updates installed successfully."
 }
 
-# Function to enable dark mode if it is not already enabled
-function Enable-DarkMode {
-    Write-Host "Ensuring dark mode is enabled..."
+# Install Applications
+function Install-Applications {
+    Write-Log "Installing Applications..."
+    $applications = Get-Content -Path $appConfig | ConvertFrom-Json
+    foreach ($app in $applications) {
+        $installerPath = "$env:TEMP\$($app.Name)_Setup.exe"
+        Write-Log "Downloading $($app.Name)..."
+        Invoke-WebRequest -Uri $app.URL -OutFile $installerPath
+        Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+        Write-Log "$($app.Name) installation complete."
+    }
+}
 
-    $darkModeKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-    $appsUseLightTheme = Get-ItemProperty -Path $darkModeKey -Name AppsUseLightTheme -ErrorAction Sil
+# Cleanup Temporary Files
+function Cleanup-TempFiles {
+    Write-Log "Cleaning up temporary files..."
+    Remove-Item -Path "$env:TEMP\*_Setup.exe" -Force -ErrorAction SilentlyContinue
+    Write-Log "Temporary files cleaned up."
+}
+
+# Main Function
+function Main {
+    Write-Log "=== New Windows Install Script Started ==="
+    Confirm-Execution
+    Initialize-AppConfig
+    Install-SSHServer
+    Generate-SSHCredentials
+    Configure-Firewall
+    Block-ChinaHosts
+    Install-WindowsUpdates
+    Install-Applications
+    Cleanup-TempFiles
+    Write-Log "All tasks completed successfully!"
+    Write-Host "Script execution complete! SSH credentials are saved on your Desktop."
+}
+
+# Run Script
+Main
