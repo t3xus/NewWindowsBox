@@ -1,62 +1,107 @@
-<h1>System Setup and Application Deployment Script</h1>
+
+# System Setup and Application Deployment Script
 
 ![Static Badge](https://img.shields.io/badge/Author-Jgooch-1F4D37)
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Static Badge](https://img.shields.io/badge/Distribution-npm-orange)
 ![Target](https://img.shields.io/badge/Target-Microsoft%20Windows%2011%20Professional-357EC7)
-<h2>Overview</h2>
 
-<p>This script automates the setup and configuration of a Windows system by:</p>
+## Overview
 
-<ul>
-<li>Disabling Xbox app from startup.</li>
-<li>Removing unnecessary third-party applications (bloatware).</li>
-<li>Cleaning up the Start Menu by unpinning unnecessary apps and pinning essential ones.</li>
-<li>Silently install openSSH & Configuring the firewall for SSH access.</li>
-<li>Silently installing <strong>TeamViewer</strong>, <strong>Office 365</strong>, <strong>Adobe Acrobat Pro</strong>, and <strong>Tailscale</strong>.</li>
-<li>Prompting the user to add a new user account with customizable options for username, password, and admin privileges.</li>
-<li>Running silent Windows updates (including security patches).</li>
-<li>Enabling dark mode if it's not already enabled.</li>
-</ul>
+This script automates the setup, configuration, and deployment of a Windows system by:
 
-<h2>Features</h2>
+- Installing and configuring OpenSSH Server, creating login credentials, and saving them to the desktop.
+- Ensuring the Windows firewall is enabled and allows SSH traffic on port 22.
+- Updating the Windows system, including installing critical security patches.
+- Blocking Chinese domains by updating the Windows `hosts` file.
+- Silently installing applications like **TeamViewer** and **Tailscale** (customizable via `apps.json`).
+- Removing unnecessary third-party applications (bloatware) and cleaning up the Start Menu.
+- Enabling dark mode for a better visual experience.
+- Prompting the user before execution with a clear Yes/No confirmation.
 
-<ul>
-<li><strong>Windows Update</strong>: Automatically installs the latest Windows updates, including critical security patches, and restarts the machine if necessary.</li>
-<li><strong>Dark Mode</strong>: Automatically switches the system theme to dark mode for a more comfortable viewing experience.</li>
-<li><strong>Remove Xbox App</strong>: Removes Xbox app entries from startup and disables Xbox-related scheduled tasks.</li>
-<li><strong>Remove Bloatware</strong>: Uninstalls pre-installed third-party applications that often come bundled with Windows installations.</li>
-<li><strong>Start Menu Cleanup</strong>: Resets the Start Menu to only show <strong>Microsoft Edge</strong>, <strong>Notepad</strong>, and <strong>File Explorer</strong>.</li>
-<li><strong>Silent Installations</strong>:
-<ul>
-<li><strong>TeamViewer</strong>: Remote control and desktop sharing.</li>
-<li><strong>Office 365</strong>: Productivity suite including Word, Excel, and PowerPoint.</li>
-<li><strong>Adobe Acrobat Pro</strong>: PDF creation and management.</li>
-<li><strong>Tailscale</strong>: Secure VPN for easy remote access.</li>
-</ul></li>
-<li><strong>New User Creation</strong>: Prompts the user to add a new system account with an option to set admin privileges.</li>
-<li><strong>Firewall Configuration</strong>: Opens port 22 for SSH access, ensuring secure communication.</li>
-</ul>
+---
 
-<h2>Prerequisites</h2>
+## Features
 
-<ul>
-<li>PowerShell 5.1 or later</li>
-<li>Internet connection for downloading application installers and updates.</li>
-</ul>
+- **Windows Update**: Automatically installs the latest Windows updates and security patches.
+- **OpenSSH Server**:
+    - Installs and configures OpenSSH Server.
+    - Generates SSH login credentials and saves them to a file on the desktop.
+    - Configures the Windows firewall to allow SSH traffic on port 22.
+- **Firewall Configuration**: Ensures the Windows firewall is enabled and configured for secure SSH access.
+- **Hosts File Update**: Blocks known Chinese domains by appending entries to the system's `hosts` file.
+- **Dark Mode**: Switches the Windows theme to dark mode.
+- **Silent Application Installations**:
+    - Customizable via `apps.json`, allowing you to add or remove apps.
+    - Default applications:
+        - **TeamViewer**: Remote desktop and control software.
+        - **Tailscale**: VPN for secure remote access.
+- **Yes/No Confirmation**: Prompts the user before making any changes or installations.
+- **Temporary File Cleanup**: Automatically removes downloaded installers after use.
 
-<h2>How to Use</h2>
+---
 
-<ol>
-<li>Download and run the script in PowerShell as an administrator.</li>
-<li>Follow the prompts to add a new user account if desired.</li>
-<li>The script will silently install updates, configure privacy settings, install necessary applications, and clean up the system.</li>
-</ol>
+## Prerequisites
 
-<h3>Example</h3>
+- PowerShell 5.1 or later.
+- Internet connection for downloading application installers and updates.
 
-<p><code>powershell
-.\nwb.ps1
-</code></p>
+---
 
-<p>Once the script is executed, all the tasks will run automatically, including system updates, bloatware removal, app installations, and configuration of user accounts and firewall.</p>
+## How to Use
+
+1. Download the script and run it in PowerShell as an administrator.
+2. On the first run, the script will create a default `apps.json` file. Edit this file to customize which applications to install.
+3. Confirm the Yes/No prompt to proceed.
+4. SSH login credentials will be generated and saved on the desktop as `ssh_credentials.txt`.
+5. The script will block Chinese domains, install updates, configure SSH, and install applications.
+
+---
+
+### Example
+
+Run the script with the following command:
+
+```powershell
+.
+wb.ps1
+```
+
+---
+
+## Customizing Applications
+
+The `apps.json` file allows you to define additional applications to install. The file should look like this:
+
+```json
+[
+    { "Name": "TeamViewer", "URL": "https://download.teamviewer.com/download/TeamViewer_Setup.exe" },
+    { "Name": "Tailscale", "URL": "https://pkgs.tailscale.com/stable/tailscale-setup.exe" }
+]
+```
+
+Add or remove application entries to customize your installation.
+
+---
+
+## Output
+
+- SSH login credentials are saved to `ssh_credentials.txt` on the desktop.
+- The Windows system is updated with the latest patches.
+- Chinese domains are blocked in the `hosts` file.
+- All specified applications are installed silently.
+- Temporary installation files are cleaned up automatically.
+
+---
+
+## Notes
+
+- The script requires administrator privileges.
+- Ensure your internet connection is stable for downloading updates and application installers.
+- SSH access is configured on port 22 for secure remote management.
+
+---
+
+## License
+
+This project is licensed under the MIT License.
